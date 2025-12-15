@@ -1,29 +1,77 @@
 # Surgical Robotics Control Systems
 
-A comprehensive Python framework for surgical robot control systems, including Da Vinci-class multi-arm platforms, neurosurgical robots, and orthopedic surgical systems.
+A comprehensive Python framework for surgical robot control systems, including Da Vinci-class multi-arm platforms, neurosurgical robots, orthopedic surgical systems, and extensive vendor integrations.
 
 ## Features
 
-### Da Vinci-Class Systems
+### Robot Systems
+
+#### Da Vinci-Class Systems
 - **Multi-arm robotic platforms** with master-slave teleoperation
 - **Haptic feedback systems** for force sensing and rendering
 - **3D stereoscopic vision** with depth perception
 - **Instrument tracking** and collision avoidance
 - Remote center of motion (RCM) constraint enforcement
 
-### Neurosurgical Robots
+#### Neurosurgical Robots
 - **Sub-millimeter positioning accuracy** (±0.1mm)
 - **Integration with intraoperative MRI/CT** imaging
 - **Tremor cancellation** with adaptive filtering
 - Stereotactic frame registration
 - Image-guided navigation
 
-### Orthopedic Robots
+#### Orthopedic Robots
 - **Bone cutting and milling systems** with various tool types
 - **Force feedback** for tissue differentiation
 - **Patient-specific surgical planning** from CT/MRI
 - Haptic boundaries for safe cutting
 - Adaptive cutting control
+
+### Vendor Integrations
+
+| Vendor | Robot Systems | Features |
+|--------|---------------|----------|
+| **Intuitive Surgical** | Da Vinci Xi/X/SP/Si | Full teleoperation, instrument control |
+| **Medtronic** | Hugo RAS, Mazor X | Multi-port surgery, spine navigation |
+| **Stryker** | Mako | AccuStop haptic boundaries, TKA/THA/PKA |
+| **Zimmer Biomet** | ROSA Knee/Hip/Spine/Brain | Procedure-specific workflows |
+| **Smith+Nephew** | CORI | Handheld robotic burr, real-time feedback |
+
+### Communication Protocols
+- **ROS2 Integration** - Full ROS2 bridge with joint states, TF, and action servers
+- **DICOM** - Medical imaging import/export with registration
+- **HL7/FHIR** - Healthcare interoperability for procedure records
+- **Real-time UDP/TCP** - Low-latency communication for control loops
+
+### Advanced Control Systems
+- **Model Predictive Control (MPC)** - Constraint-aware trajectory optimization
+- **Impedance/Admittance Control** - Compliant interaction with environment
+- **Hybrid Force-Position Control** - Simultaneous force and position tracking
+- **Reinforcement Learning** - Gymnasium-compatible environment for training
+- **Bilateral Teleoperation** - Time delay compensation with wave variables
+
+### Simulation Environment
+- **Physics Simulation** - PyBullet/MuJoCo backends
+- **Tissue Modeling** - Deformable and cuttable tissue with bleeding
+- **Surgical Scenes** - Pre-configured OR setups
+- **Robot Simulation** - Full kinematic and dynamic simulation
+
+### Workflow Management
+- **State Machines** - Robot operational states and procedure phases
+- **Task Sequencing** - Surgical task management with dependencies
+- **Safety States** - IEC 62443 compliant safety monitoring
+- **Emergency Handling** - Coordinated emergency response
+
+### Telemetry & Monitoring
+- **Structured Logging** - JSON logs with medical audit trails
+- **Metrics Collection** - Prometheus-compatible metrics
+- **Data Recording** - High-frequency data capture and replay
+- **Audit Logging** - Tamper-evident medical device logging
+
+### Compliance Helpers
+- **IEC 62304** - Software lifecycle management
+- **IEC 60601** - Electrical safety and risk analysis
+- **FDA 21 CFR 820** - Quality system records and design controls
 
 ## Installation
 
@@ -35,110 +83,92 @@ cd surgical-robotics
 # Install in development mode
 pip install -e ".[dev]"
 
-# Or install with optional dependencies
-pip install -e ".[dev,vision,simulation]"
+# Install with all optional dependencies
+pip install -e ".[all]"
+
+# Or install specific extras
+pip install -e ".[simulation,vision]"
 ```
 
 ## Quick Start
 
-### Da Vinci Robot
+### Basic Simulation
 
 ```python
-from surgical_robotics.davinci import DaVinciRobot
-from surgical_robotics.core.base import Pose
+from surgical_robotics.simulation import SurgicalScene, RobotSimulator
+from surgical_robotics.simulation.scene import SurgicalProcedureScene
 import numpy as np
 
-# Initialize the robot
-robot = DaVinciRobot(num_patient_arms=3, has_endoscope=True)
-robot.initialize()
-robot.calibrate()
+# Create laparoscopic scene
+scene = SurgicalProcedureScene.create_laparoscopic_scene()
 
-# Set remote center of motion for an arm
-robot.set_rcm(0, np.array([0.0, 0.0, 0.3]))
+# Add robot
+robot = RobotSimulator(name="arm", num_joints=7)
+scene.add_robot(robot, "arm", np.array([0, -0.5, 0]))
+
+# Run simulation
+for _ in range(1000):
+    robot.step(0.01)
+    scene.step(0.01)
+```
+
+### Teleoperation
+
+```python
+from surgical_robotics.control import TeleoperationController
+from surgical_robotics.control.teleoperation import TeleoperationConfig, TeleoperationMode
+
+config = TeleoperationConfig(
+    mode=TeleoperationMode.POSITION,
+    position_scale=0.5,  # 2:1 motion reduction
+)
+
+controller = TeleoperationController(config)
+controller.enable()
+
+# Set clutch reference
+controller.engage_clutch(master_pose, slave_pose)
+controller.release_clutch()
+
+# Update loop
+slave_command, feedback = controller.update(
+    master_pose, master_velocity,
+    slave_pose, slave_force, dt=0.01
+)
+```
+
+### Vendor Integration
+
+```python
+from surgical_robotics.vendors import IntuitiveDaVinciInterface
+
+# Connect to Da Vinci Xi
+robot = IntuitiveDaVinciInterface(model="xi")
+robot.connect()
+robot.initialize()
 
 # Start teleoperation
-robot.start_teleoperation()
+robot.engage_clutch("arm_0")
+robot.release_clutch("arm_0")
 
-# Move arm to a target pose
-target = Pose(
-    position=np.array([0.1, 0.05, 0.25]),
-    orientation=np.array([1, 0, 0, 0])
-)
-robot.move_to_pose(0, target)
+# Get telemetry
+state = robot.get_system_state()
 ```
 
-### Neurosurgical Robot
+### CLI Usage
 
-```python
-from surgical_robotics.neurosurgical import (
-    NeurosurgicalRobot,
-    StereotacticFrame,
-    NeurosurgicalTarget,
-)
-import numpy as np
+```bash
+# Run simulation
+surgical-robotics simulate --scene laparoscopic --render
 
-# Initialize the robot
-robot = NeurosurgicalRobot()
-robot.initialize()
-robot.calibrate()
+# Generate configuration
+surgical-robotics config --generate davinci_xi --output config.json
 
-# Set up stereotactic frame
-frame = StereotacticFrame(frame_id="leksell_frame")
-frame.add_fiducial(np.array([0, 0, 0]))
-frame.add_fiducial(np.array([0.1, 0, 0]))
-frame.add_fiducial(np.array([0, 0.1, 0]))
+# Run diagnostics
+surgical-robotics diagnose --full
 
-# Register frame to image coordinates
-image_points = [...]  # From preoperative imaging
-frame.compute_registration(image_points)
-robot.set_stereotactic_frame(frame)
-
-# Define and set surgical target
-target = NeurosurgicalTarget(
-    name="tumor_biopsy",
-    position=np.array([0.05, 0.02, -0.04]),
-    entry_point=np.array([0.05, 0.02, 0.0])
-)
-robot.set_target(target)
-
-# Approach and advance to target
-robot.approach_target(approach_distance=0.02)
-robot.advance_to_target(step_size=0.001)
-```
-
-### Orthopedic Robot
-
-```python
-from surgical_robotics.orthopedic import (
-    OrthopedicRobot,
-    CuttingMode,
-    BoneCutPlanner,
-    PatientModel,
-    BoneType,
-)
-import numpy as np
-
-# Initialize the robot
-robot = OrthopedicRobot()
-robot.initialize()
-robot.calibrate()
-
-# Register bone anatomy
-ct_landmarks = [...]  # From CT scan
-robot_landmarks = [...]  # Digitized with robot
-robot.register_bone("femur", ct_landmarks, robot_landmarks)
-
-# Set cutting mode and start spindle
-robot.set_cutting_mode(CuttingMode.BURR)
-robot.start_spindle()
-robot.set_coolant(True)
-
-# Execute cutting path
-path_points = [np.array([0.01, 0, -0.005]), np.array([0.02, 0, -0.005])]
-robot.execute_cutting_path(path_points, feed_rate=0.003)
-
-# Stop when done
-robot.stop_spindle()
+# System status
+surgical-robotics status --json
 ```
 
 ## Project Structure
@@ -147,26 +177,46 @@ robot.stop_spindle()
 surgical-robotics/
 ├── src/surgical_robotics/
 │   ├── core/                 # Core components
-│   │   ├── base.py          # Base classes (SurgicalRobot, Pose, etc.)
-│   │   ├── kinematics.py    # Forward/inverse kinematics
-│   │   └── safety.py        # Safety controllers, collision detection
-│   ├── davinci/             # Da Vinci-class systems
-│   │   ├── robot.py         # Main robot class
-│   │   ├── haptics.py       # Haptic feedback
-│   │   ├── vision.py        # Stereoscopic vision
-│   │   └── instruments.py   # Surgical instruments
-│   ├── neurosurgical/       # Neurosurgical robots
-│   │   ├── robot.py         # Main robot class
-│   │   ├── imaging.py       # MRI/CT integration
-│   │   └── tremor.py        # Tremor cancellation
-│   └── orthopedic/          # Orthopedic robots
-│       ├── robot.py         # Main robot class
-│       ├── cutting.py       # Bone cutting systems
-│       ├── force_feedback.py # Force sensing
-│       └── planning.py      # Surgical planning
-├── tests/                   # Test suite
-├── pyproject.toml          # Project configuration
-└── README.md
+│   ├── davinci/              # Da Vinci systems
+│   ├── neurosurgical/        # Neurosurgical robots
+│   ├── orthopedic/           # Orthopedic robots
+│   ├── vendors/              # Vendor integrations
+│   │   ├── intuitive.py      # Intuitive Surgical
+│   │   ├── medtronic.py      # Medtronic Hugo/Mazor
+│   │   ├── stryker.py        # Stryker Mako
+│   │   ├── zimmer.py         # Zimmer ROSA
+│   │   └── smith_nephew.py   # Smith+Nephew CORI
+│   ├── communication/        # Communication protocols
+│   │   ├── ros2.py           # ROS2 bridge
+│   │   ├── dicom.py          # DICOM integration
+│   │   ├── hl7.py            # HL7/FHIR
+│   │   └── realtime.py       # UDP/TCP transport
+│   ├── control/              # Advanced control
+│   │   ├── mpc.py            # Model Predictive Control
+│   │   ├── impedance.py      # Impedance control
+│   │   ├── rl_interface.py   # RL environment
+│   │   └── teleoperation.py  # Bilateral teleoperation
+│   ├── simulation/           # Simulation environment
+│   │   ├── physics.py        # Physics backends
+│   │   ├── scene.py          # Surgical scenes
+│   │   ├── tissue.py         # Tissue simulation
+│   │   └── robot_sim.py      # Robot simulation
+│   ├── workflow/             # Workflow management
+│   │   ├── state_machine.py  # State machines
+│   │   ├── procedure.py      # Procedure workflows
+│   │   └── safety_states.py  # Safety monitoring
+│   ├── telemetry/            # Telemetry & logging
+│   │   ├── logging.py        # Structured logging
+│   │   ├── metrics.py        # Metrics collection
+│   │   └── recording.py      # Data recording
+│   ├── compliance/           # Compliance helpers
+│   │   ├── iec62304.py       # Software lifecycle
+│   │   ├── iec60601.py       # Electrical safety
+│   │   └── fda.py            # FDA QSR
+│   └── cli/                  # Command-line interface
+├── examples/                 # Example scripts
+├── tests/                    # Test suite
+└── pyproject.toml
 ```
 
 ## Testing
@@ -178,8 +228,8 @@ pytest
 # Run with coverage
 pytest --cov=surgical_robotics --cov-report=html
 
-# Run specific test file
-pytest tests/test_davinci.py -v
+# Run specific test modules
+pytest tests/test_simulation.py tests/test_control.py -v
 ```
 
 ## Safety Considerations
@@ -188,26 +238,27 @@ This library is intended for **research and educational purposes only**.
 
 - **NOT for clinical use** without proper regulatory approval
 - All safety-critical features require extensive validation
-- Force limits and collision detection must be verified for specific applications
-- Tremor cancellation parameters should be tuned for individual patients
+- Force limits and collision detection must be verified
+- Vendor integrations are reference implementations only
 
 ## Key Concepts
 
-### Kinematics
-- Uses Denavit-Hartenberg (DH) convention for robot modeling
-- Forward kinematics via homogeneous transformations
-- Inverse kinematics using damped least squares
+### Control Architecture
+- Hierarchical control with safety supervisor
+- 1kHz control loops with real-time support
+- Force/torque limiting at multiple levels
 
 ### Safety Systems
-- Multi-level safety classification (Normal, Caution, Warning, Critical)
-- Virtual fixtures for motion guidance
-- Force/torque limiting and monitoring
-- Collision detection between instruments
+- IEC 62443 compliant safety states
+- Virtual fixtures and haptic boundaries
+- Watchdog monitoring and emergency stop
+- Audit logging for all safety events
 
-### Haptic Feedback
-- Force scaling for teleoperation
-- Tissue interaction models
-- Vibration rendering for texture feedback
+### Simulation
+- Modular physics with multiple backends
+- Real-time capable tissue deformation
+- Bleeding and cautery simulation
+- Recording and playback for analysis
 
 ## License
 
@@ -219,12 +270,11 @@ Contributions are welcome! Please read our contributing guidelines and submit pu
 
 ## Citation
 
-If you use this software in your research, please cite:
-
 ```bibtex
 @software{surgical_robotics,
   title = {Surgical Robotics Control Systems},
   year = {2024},
+  version = {0.2.0},
   url = {https://github.com/surgical-robotics/surgical-robotics}
 }
 ```

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "surgical-robotics"
-version = "0.1.0"
+version = "0.2.0"
 description = "Advanced Surgical Robotics Control Systems"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,7 +13,7 @@ authors = [
     {name = "Surgical Robotics Team"}
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Healthcare Industry",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
@@ -44,7 +44,17 @@ vision = [
 ]
 simulation = [
     "pybullet>=3.2.0",
+    "mujoco>=2.3.0",
 ]
+ros2 = [
+    "rclpy>=1.0.0",
+]
+all = [
+    "surgical-robotics[dev,vision,simulation,ros2]",
+]
+
+[project.scripts]
+surgical-robotics = "surgical_robotics.cli.commands:main"
 
 [project.urls]
 Homepage = "https://github.com/surgical-robotics"
